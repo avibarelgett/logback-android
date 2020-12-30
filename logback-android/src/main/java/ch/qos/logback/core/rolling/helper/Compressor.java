@@ -22,7 +22,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -31,6 +30,10 @@ import ch.qos.logback.core.spi.ContextAwareBase;
 import ch.qos.logback.core.status.ErrorStatus;
 import ch.qos.logback.core.status.WarnStatus;
 import ch.qos.logback.core.util.FileUtil;
+import net.lingala.zip4j.ZipFile;
+import net.lingala.zip4j.exception.ZipException;
+import net.lingala.zip4j.model.ZipParameters;
+import net.lingala.zip4j.model.enums.EncryptionMethod;
 
 /**
  * The <code>Compression</code> class implements ZIP and GZ file
@@ -167,9 +170,9 @@ public class Compressor extends ContextAwareBase {
 
 
   private void gzCompress(String nameOfFile2gz, String nameOfgzedFile) {
-    File file2gz = new File(nameOfFile2gz);
+    File file2Compress = new File(nameOfFile2gz);
 
-    if (!file2gz.exists()) {
+    if (!file2Compress.exists()) {
       addStatus(new WarnStatus("The file to compress named [" + nameOfFile2gz
               + "] does not exist.", this));
 
@@ -181,52 +184,62 @@ public class Compressor extends ContextAwareBase {
       nameOfgzedFile = nameOfgzedFile + ".gz";
     }
 
-    File gzedFile = new File(nameOfgzedFile);
+    ZipParameters zipParameters = new ZipParameters();
+    zipParameters.setEncryptionMethod(EncryptionMethod.ZIP_STANDARD);
+    zipParameters.setEncryptFiles(true);
 
-    if (gzedFile.exists()) {
+    ZipFile securedFile = new ZipFile(nameOfgzedFile, "TEST_SECURED_FILE".toCharArray());
+
+    if (securedFile.getFile().exists()) {
       addWarn("The target compressed file named ["
               + nameOfgzedFile + "] exist already. Aborting file compression.");
       return;
     }
 
-    addInfo("GZ compressing [" + file2gz + "] as ["+gzedFile+"]");
-    createMissingTargetDirsIfNecessary(gzedFile);
+    addInfo("GZ compressing [" + file2Compress + "] as ["+securedFile.getFile()+"]");
+    createMissingTargetDirsIfNecessary(securedFile.getFile());
 
-    BufferedInputStream bis = null;
-    GZIPOutputStream gzos = null;
     try {
-      bis = new BufferedInputStream(new FileInputStream(nameOfFile2gz));
-      gzos = new GZIPOutputStream(new FileOutputStream(nameOfgzedFile));
-      byte[] inbuf = new byte[BUFFER_SIZE];
-      int n;
-
-      while ((n = bis.read(inbuf)) != -1) {
-        gzos.write(inbuf, 0, n);
-      }
-
-      addInfo("Done ZIP compressing [" + file2gz + "] as [" + gzedFile + "]");
-
-    } catch (Exception e) {
-      addStatus(new ErrorStatus("Error occurred while compressing ["
-              + nameOfFile2gz + "] into [" + nameOfgzedFile + "].", this, e));
-    } finally {
-      if (bis != null) {
-        try {
-          bis.close();
-        } catch (IOException e) {
-          // ignore
-        }
-      }
-      if (gzos != null) {
-        try {
-          gzos.close();
-        } catch (IOException e) {
-          // ignore
-        }
-      }
+      securedFile.addFile(file2Compress, zipParameters);
+    } catch (ZipException e) {
+      // ignore
     }
 
-    if (!file2gz.delete()) {
+    //BufferedInputStream bis = null;
+    //GZIPOutputStream gzos = null;
+    //try {
+    //  bis = new BufferedInputStream(new FileInputStream(nameOfFile2gz));
+    //  gzos = new GZIPOutputStream(new FileOutputStream(nameOfgzedFile));
+    //  byte[] inbuf = new byte[BUFFER_SIZE];
+    //  int n;
+    //
+    //  while ((n = bis.read(inbuf)) != -1) {
+    //    gzos.write(inbuf, 0, n);
+    //  }
+    //
+    //  addInfo("Done ZIP compressing [" + file2Compress + "] as [" + securedFile.getFile() + "]");
+    //
+    //} catch (Exception e) {
+    //  addStatus(new ErrorStatus("Error occurred while compressing ["
+    //          + nameOfFile2gz + "] into [" + nameOfgzedFile + "].", this, e));
+    //} finally {
+    //  if (bis != null) {
+    //    try {
+    //      bis.close();
+    //    } catch (IOException e) {
+    //      // ignore
+    //    }
+    //  }
+    //  if (gzos != null) {
+    //    try {
+    //      gzos.close();
+    //    } catch (IOException e) {
+    //      // ignore
+    //    }
+    //  }
+    //}
+
+    if (!file2Compress.delete()) {
       addStatus(new WarnStatus("Could not delete [" + nameOfFile2gz + "].",
               this));
     }

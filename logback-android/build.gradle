@@ -71,6 +71,8 @@ dependencies {
         exclude(module: 'slf4j-api')
     }
 
+    implementation "net.lingala.zip4j:zip4j:2.6.4"
+
     compileOnly "org.slf4j:slf4j-api:${slf4jVersion}"
 
     // For SMTPAppender
