@@ -43,11 +43,21 @@ public class RollingFileAppender<E> extends FileAppender<E> {
   TriggeringPolicy<E> triggeringPolicy;
   RollingPolicy rollingPolicy;
 
+  private String password;
+
   static private String RFA_NO_TP_URL = CODES_URL + "#rfa_no_tp";
   static private String RFA_NO_RP_URL = CODES_URL + "#rfa_no_rp";
   static private String COLLISION_URL = CODES_URL + "#rfa_collision";
   static private String RFA_LATE_FILE_URL = CODES_URL + "#rfa_file_after";
   static private String MORE_INFO_PREFIX = "For more information, please visit ";
+
+  public RollingFileAppender() {
+    this.password = null;
+  }
+
+  public RollingFileAppender(String password) {
+    this.password = password;
+  }
 
   public void start() {
     if (triggeringPolicy == null) {
@@ -209,7 +219,7 @@ public class RollingFileAppender<E> extends FileAppender<E> {
 
   private void attemptRollover() {
     try {
-      rollingPolicy.rollover();
+      rollingPolicy.rollover(password);
     } catch (RolloverFailure rf) {
       addWarn("RolloverFailure occurred. Deferring roll-over.");
       // we failed to roll-over, let us not truncate and risk data loss

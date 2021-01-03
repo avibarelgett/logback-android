@@ -23,6 +23,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipInputStream;
+import net.lingala.zip4j.ZipFile;
 
 public class Compare {
 
@@ -96,13 +97,20 @@ public class Compare {
     return true;
   }
 
-  public static boolean gzCompare(String file1, String file2) throws IOException {
+  public static boolean gzCompare(String file1, String file2, String password) throws IOException {
     BufferedReader in1 = null;
     BufferedReader in2 = null;
 
     try {
-      in1 = new BufferedReader(new InputStreamReader(
-              new GZIPInputStream(new FileInputStream(file1))));
+      if (password == null || password.length() == 0) {
+        in1 = new BufferedReader(
+            new InputStreamReader(new GZIPInputStream(new FileInputStream(file1))));
+      } else {
+        ZipFile zipFile = new ZipFile(file1, password.toCharArray());
+        in1 = new BufferedReader(new InputStreamReader(
+            zipFile.getInputStream(zipFile.getFileHeaders().get(0))));
+      }
+
       in2 = new BufferedReader(new InputStreamReader(
               new GZIPInputStream(new FileInputStream(file2))));
 

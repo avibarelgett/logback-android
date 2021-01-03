@@ -157,8 +157,7 @@ public class TimeBasedRollingPolicy<E> extends RollingPolicyBase implements
     return timeBasedFileNamingAndTriggeringPolicy;
   }
 
-  public void rollover() throws RolloverFailure {
-
+  public void rollover(String password) throws RolloverFailure {
     // when rollover is called the elapsed period's file has
     // been already closed. This is a working assumption of this method.
 
@@ -173,9 +172,9 @@ public class TimeBasedRollingPolicy<E> extends RollingPolicyBase implements
       } // else { nothing to do if CompressionMode == NONE and parentsRawFileProperty == null }
     } else {
       if (getParentsRawFileProperty() == null) {
-        compressionFuture = compressor.asyncCompress(elapsedPeriodsFileName, elapsedPeriodsFileName, elapsedPeriodStem);
+        compressionFuture = compressor.asyncCompress(elapsedPeriodsFileName, elapsedPeriodsFileName, elapsedPeriodStem, password);
       } else {
-        compressionFuture = renameRawAndAsyncCompress(elapsedPeriodsFileName, elapsedPeriodStem);
+        compressionFuture = renameRawAndAsyncCompress(elapsedPeriodsFileName, elapsedPeriodStem, password);
       }
     }
 
@@ -185,12 +184,12 @@ public class TimeBasedRollingPolicy<E> extends RollingPolicyBase implements
     }
   }
 
-  Future<?> renameRawAndAsyncCompress(String nameOfCompressedFile, String innerEntryName)
+  Future<?> renameRawAndAsyncCompress(String nameOfCompressedFile, String innerEntryName, String password)
       throws RolloverFailure {
     String parentsRawFile = getParentsRawFileProperty();
     String tmpTarget = nameOfCompressedFile + System.nanoTime() + ".tmp";
     renameUtil.rename(parentsRawFile, tmpTarget);
-    return compressor.asyncCompress(tmpTarget, nameOfCompressedFile, innerEntryName);
+    return compressor.asyncCompress(tmpTarget, nameOfCompressedFile, innerEntryName, password);
   }
 
   /**

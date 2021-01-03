@@ -38,7 +38,7 @@ public interface RollingPolicy extends LifeCycle {
    * @throws RolloverFailure
    *                 Thrown if the rollover operation fails for any reason.
    */
-  void rollover() throws RolloverFailure;
+  void rollover(String password) throws RolloverFailure;
 
   /**
    * Get the name of the active log file.
