@@ -123,7 +123,7 @@ public class FixedWindowRollingPolicy extends RollingPolicyBase {
     return stemOfFileNamePattern.replace("%i", "%d{"+ZIP_ENTRY_DATE_PATTERN+"}");
   }
 
-  public void rollover() throws RolloverFailure {
+  public void rollover(String password) throws RolloverFailure {
 
     // Inside this method it is guaranteed that the hereto active log file is
     // closed.
@@ -155,10 +155,10 @@ public class FixedWindowRollingPolicy extends RollingPolicyBase {
             .convertInt(minIndex));
         break;
       case GZ:
-        compressor.compress(getActiveFileName(), fileNamePattern.convertInt(minIndex), null);
+        compressor.compress(getActiveFileName(), fileNamePattern.convertInt(minIndex), null, password);
         break;
       case ZIP:
-        compressor.compress(getActiveFileName(), fileNamePattern.convertInt(minIndex), zipEntryFileNamePattern.convert(new Date()));
+        compressor.compress(getActiveFileName(), fileNamePattern.convertInt(minIndex), zipEntryFileNamePattern.convert(new Date()), password);
         break;
       }
     }

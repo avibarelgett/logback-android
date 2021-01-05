@@ -31,6 +31,10 @@ import ch.qos.logback.core.spi.ContextAwareBase;
 import ch.qos.logback.core.status.ErrorStatus;
 import ch.qos.logback.core.status.WarnStatus;
 import ch.qos.logback.core.util.FileUtil;
+import net.lingala.zip4j.ZipFile;
+import net.lingala.zip4j.exception.ZipException;
+import net.lingala.zip4j.model.ZipParameters;
+import net.lingala.zip4j.model.enums.EncryptionMethod;
 
 /**
  * The <code>Compression</code> class implements ZIP and GZ file
@@ -53,10 +57,10 @@ public class Compressor extends ContextAwareBase {
    * @param nameOfCompressedFile the desired name of the compressed file
    * @param innerEntryName       The name of the file within the zip file. Use for ZIP compression.
    */
-  public void compress(String nameOfFile2Compress, String nameOfCompressedFile, String innerEntryName) {
+  public void compress(String nameOfFile2Compress, String nameOfCompressedFile, String innerEntryName, String password) {
     switch (compressionMode) {
       case GZ:
-        gzCompress(nameOfFile2Compress, nameOfCompressedFile);
+        gzCompress(nameOfFile2Compress, nameOfCompressedFile, password);
         break;
       case ZIP:
         zipCompress(nameOfFile2Compress, nameOfCompressedFile, innerEntryName);
@@ -166,10 +170,10 @@ public class Compressor extends ContextAwareBase {
   }
 
 
-  private void gzCompress(String nameOfFile2gz, String nameOfgzedFile) {
-    File file2gz = new File(nameOfFile2gz);
+  private void gzCompress(String nameOfFile2gz, String nameOfgzedFile, String password) {
+    File file2Compress = new File(nameOfFile2gz);
 
-    if (!file2gz.exists()) {
+    if (!file2Compress.exists()) {
       addStatus(new WarnStatus("The file to compress named [" + nameOfFile2gz
               + "] does not exist.", this));
 
@@ -181,52 +185,75 @@ public class Compressor extends ContextAwareBase {
       nameOfgzedFile = nameOfgzedFile + ".gz";
     }
 
-    File gzedFile = new File(nameOfgzedFile);
+    if (password == null || password.length() == 0) {
+      BufferedInputStream bis = null;
+      GZIPOutputStream gzos = null;
+      try {
+        File gzedFile = new File(nameOfgzedFile);
 
-    if (gzedFile.exists()) {
-      addWarn("The target compressed file named ["
+        if (gzedFile.exists()) {
+          addWarn("The target compressed file named ["
               + nameOfgzedFile + "] exist already. Aborting file compression.");
-      return;
-    }
+          return;
+        }
 
-    addInfo("GZ compressing [" + file2gz + "] as ["+gzedFile+"]");
-    createMissingTargetDirsIfNecessary(gzedFile);
+        addInfo("GZ compressing [" + file2Compress + "] as ["+gzedFile+"]");
+        createMissingTargetDirsIfNecessary(gzedFile);
 
-    BufferedInputStream bis = null;
-    GZIPOutputStream gzos = null;
-    try {
-      bis = new BufferedInputStream(new FileInputStream(nameOfFile2gz));
-      gzos = new GZIPOutputStream(new FileOutputStream(nameOfgzedFile));
-      byte[] inbuf = new byte[BUFFER_SIZE];
-      int n;
+        bis = new BufferedInputStream(new FileInputStream(nameOfFile2gz));
+        gzos = new GZIPOutputStream(new FileOutputStream(nameOfgzedFile));
+        byte[] inbuf = new byte[BUFFER_SIZE];
+        int n;
 
-      while ((n = bis.read(inbuf)) != -1) {
-        gzos.write(inbuf, 0, n);
-      }
+        while ((n = bis.read(inbuf)) != -1) {
+          gzos.write(inbuf, 0, n);
+        }
 
-      addInfo("Done ZIP compressing [" + file2gz + "] as [" + gzedFile + "]");
+        addInfo("Done ZIP compressing [" + file2Compress + "] as [" + gzedFile + "]");
 
-    } catch (Exception e) {
-      addStatus(new ErrorStatus("Error occurred while compressing ["
-              + nameOfFile2gz + "] into [" + nameOfgzedFile + "].", this, e));
-    } finally {
-      if (bis != null) {
-        try {
-          bis.close();
-        } catch (IOException e) {
-          // ignore
+      } catch (Exception e) {
+        addStatus(new ErrorStatus("Error occurred while compressing ["
+            + nameOfFile2gz + "] into [" + nameOfgzedFile + "].", this, e));
+      } finally {
+        if (bis != null) {
+          try {
+            bis.close();
+          } catch (IOException e) {
+            // ignore
+          }
+        }
+        if (gzos != null) {
+          try {
+            gzos.close();
+          } catch (IOException e) {
+            // ignore
+          }
         }
       }
-      if (gzos != null) {
-        try {
-          gzos.close();
-        } catch (IOException e) {
-          // ignore
-        }
+    } else {
+      ZipParameters zipParameters = new ZipParameters();
+      zipParameters.setEncryptionMethod(EncryptionMethod.ZIP_STANDARD);
+      zipParameters.setEncryptFiles(true);
+
+      ZipFile securedFile = new ZipFile(nameOfgzedFile, password.toCharArray());
+
+      if (securedFile.getFile().exists()) {
+        addWarn("The target compressed file named ["
+            + nameOfgzedFile + "] exist already. Aborting file compression.");
+        return;
+      }
+
+      addInfo("GZ compressing [" + file2Compress + "] as ["+securedFile.getFile()+"]");
+      createMissingTargetDirsIfNecessary(securedFile.getFile());
+
+      try {
+        securedFile.addFile(file2Compress, zipParameters);
+      } catch (ZipException e) {
+        // ignore
       }
     }
 
-    if (!file2gz.delete()) {
+    if (!file2Compress.delete()) {
       addStatus(new WarnStatus("Could not delete [" + nameOfFile2gz + "].",
               this));
     }
@@ -264,8 +291,8 @@ public class Compressor extends ContextAwareBase {
     return this.getClass().getName();
   }
 
-  public Future<?> asyncCompress(String nameOfFile2Compress, String nameOfCompressedFile, String innerEntryName) throws RolloverFailure {
-    CompressionRunnable runnable = new CompressionRunnable(nameOfFile2Compress, nameOfCompressedFile, innerEntryName);
+  public Future<?> asyncCompress(String nameOfFile2Compress, String nameOfCompressedFile, String innerEntryName, String password) throws RolloverFailure {
+    CompressionRunnable runnable = new CompressionRunnable(nameOfFile2Compress, nameOfCompressedFile, innerEntryName, password);
     ExecutorService executorService = context.getScheduledExecutorService();
     Future<?> future = executorService.submit(runnable);
     return future;
@@ -275,15 +302,17 @@ public class Compressor extends ContextAwareBase {
     final String nameOfFile2Compress;
     final String nameOfCompressedFile;
     final String innerEntryName;
+    final String password;
 
-    CompressionRunnable(String nameOfFile2Compress, String nameOfCompressedFile, String innerEntryName) {
+    CompressionRunnable(String nameOfFile2Compress, String nameOfCompressedFile, String innerEntryName, String password) {
       this.nameOfFile2Compress = nameOfFile2Compress;
       this.nameOfCompressedFile = nameOfCompressedFile;
       this.innerEntryName = innerEntryName;
+      this.password = password;
     }
 
     public void run() {
-      Compressor.this.compress(nameOfFile2Compress, nameOfCompressedFile, innerEntryName);
+      Compressor.this.compress(nameOfFile2Compress, nameOfCompressedFile, innerEntryName, password);
     }
   }
 }
